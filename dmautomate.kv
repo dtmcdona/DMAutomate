@@ -1,0 +1,29 @@
+<MyRoot>
+
+    status: status
+
+    BoxLayout:
+        orientation: "vertical"
+        Label:
+            text: "DM Automate"
+            font_size: 64
+            color: 1.15, 1.95, 10.8
+        Label:
+            id: status
+            text: "_"
+            font_size: 36
+        Button:
+            text: "Record"
+            font_size: 32
+            size: 100, 25
+            on_press: root.record_macro()
+        Button:
+            text: "Play"
+            font_size: 32
+            size: 100, 25
+            on_press: root.play_macro()
+        Button:
+            text: "Load"
+            font_size: 32
+            size: 100, 25
+            on_press: root.load_macro()
