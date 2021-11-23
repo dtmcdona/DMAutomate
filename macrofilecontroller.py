@@ -1,10 +1,13 @@
 import time
+import random
 import pyautogui
 import dm_macro
 import shutil
 import os
+from sys import platform
 from pynput import keyboard
 from pynput import mouse
+from pynput.mouse import Button as mouseButton
 from importlib import reload
 
 class MacroFileController:
@@ -26,6 +29,18 @@ class MacroFileController:
         # Possibly use last key press for hotkeys/combos in future
         self.lastKeyPress = ""
         self.lastKeyRelease = ""
+        # Used to calc delta time
+        self.lastTimestamp = round(time.perf_counter(), 3)
+        self.deltaTime = 0
+        # Randomize for less detection but less efficiency
+        random.seed()
+        self.randomEnabled = False
+        self.randomTime = (random.randrange(0, 1000, 1))/1000
+        # Check which os
+        if platform == "linux" or platform == "linux2":
+            self.currentdir = os.path.dirname(os.path.abspath(__file__)) + '/'
+        elif platform == "win32":
+            self.currentdir = os.path.dirname(os.path.abspath(__file__)) + '\\'
 
     def on_move(self, x, y):
         # Get mouse position
@@ -33,22 +48,35 @@ class MacroFileController:
         mousedistance = ((self.currentMouseX-self.prevMouseX)+(self.currentMouseY-self.prevMouseY))
         # Check to see mouse has moved far enough
         if mousedistance > 10:
-            macrofile = open(self.filename, "a")
-            macrofile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ")\n")
-            macrofile.close()
+            macroFile = open(self.filename, "a")
+            # Calc delta time to save to macro
+            self.delta_time()
+            if self.deltaTime > 0.0001:
+                macroFile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ", duration="+str(self.deltaTime)+")\n")
+            else:
+                macroFile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(
+                    self.currentMouseY) + ")\n")
+            macroFile.close()
             self.prevMouseX = self.currentMouseX
             self.prevMouseY = self.currentMouseY
-            print('Pointer moved to {0}'.format(
-                (x, y)))
+            print('Mouse moved to {0}'.format((x, y)))
 
     def on_click(self, x, y, button, pressed):
         if pressed:
             # Get mouse position
             self.currentMouseX, self.currentMouseY = pyautogui.position()
             macroFile = open(self.filename, "a")
-            macroFile.write(self.currentIndent + "pyautogui.click(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ")\n")
-            macroFile.close()
-        print('{0} at {1}'.format('Pressed' if pressed else 'Released', (x, y)))
+            # Calc delta time to save to macro
+            self.delta_time()
+            if self.deltaTime > 0.01:
+                macroFile.write(self.currentIndent + "time.sleep({0})\n".format(self.deltaTime))
+            if button == mouseButton.left:
+                macroFile.write(self.currentIndent + "pyautogui.click(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ", button='left')\n")
+                macroFile.close()
+            if button == mouseButton.right:
+                macroFile.write(self.currentIndent + "pyautogui.click(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ", button='right')\n")
+                macroFile.close()
+        print('Mouse '+str(button)+' {0} at {1}'.format('pressed' if pressed else 'released', (x, y)))
         if not pressed:
             # Stop listener
             return False
@@ -61,22 +89,40 @@ class MacroFileController:
     def on_press(self, key):
         try:
             print('Letter key {0} pressed'.format(key.char))
-            macrofile = open(self.filename, "a")
-            macrofile.write(self.currentIndent + "keyboard.press({0})\n".format(key))
-            macrofile.close()
+            macroFile = open(self.filename, "a")
+            # Calc delta time to save to macro
+            self.delta_time()
+            if self.deltaTime > 0.01:
+                macroFile.write(self.currentIndent + "time.sleep({0})\n".format(self.deltaTime))
+            macroFile.write(self.currentIndent + "keyboard.press({0})\n".format(key))
+            macroFile.close()
         except AttributeError:
             print('Unique key {0} pressed'.format(
                 key))
 
     def on_release(self, key):
         print('{0} released'.format(key))
-        macrofile = open(self.filename, "a")
-        macrofile.write(self.currentIndent + "keyboard.release({0})\n".format(key))
-        macrofile.close()
+        macroFile = open(self.filename, "a")
+        # Calc delta time to save to macro
+        self.delta_time()
+        if self.deltaTime > 0.01:
+            macroFile.write(self.currentIndent + "time.sleep({0})\n".format(self.deltaTime))
+        macroFile.write(self.currentIndent + "keyboard.release({0})\n".format(key))
+        macroFile.close()
         if key == keyboard.Key.esc:
             self.running = False
             # Stop listener
             return False
+
+    def delta_time(self):
+        # Calc delta time to save to macro
+        self.deltaTime = round((time.perf_counter()-self.lastTimestamp), 1)
+        self.lastTimestamp = round(time.perf_counter(), 3)
+        if self.randomEnabled:
+            self.randomTime = (random.randrange(0, 1000, 1)) / 1000
+            self.deltaTime += self.randomTime
+            self.lastTimestamp += self.randomTime
+        print(self.deltaTime)
 
     def create_macro(self):
         print("Recording...")
@@ -90,6 +136,8 @@ class MacroFileController:
         self.currentIndent = "\t"
         newMacroFile.write(self.currentIndent + "# pyautogui.FAILSAFE = False\n")
         newMacroFile.close()
+        # Reset deltatime
+        self.delta_time()
 
     def play_macro(self):
         print("Playing")
@@ -100,17 +148,15 @@ class MacroFileController:
 
     def save_macro(self, filename):
         print("Saving...")
-        filepath = os.path.dirname(os.path.abspath(__file__))+'\\'
-        src = r''+filepath+'dm_macro.py'
-        dst = r''+filepath+filename
+        src = r''+self.currentdir+'dm_macro.py'
+        dst = r''+self.currentdir+filename
         shutil.copyfile(src, dst)
         print("Saved macro as: "+filename)
 
     def load_macro(self, filename):
         print("Loading...")
-        filepath = os.path.dirname(os.path.abspath(__file__)) + '\\'
-        src = r'' + filepath + filename
-        dst = r'' + filepath + 'dm_macro.py'
+        src = r'' + self.currentdir + filename
+        dst = r'' + self.currentdir + 'dm_macro.py'
         shutil.copyfile(src, dst)
         print("Loaded macro: " + filename)
 
@@ -129,16 +175,17 @@ class MacroFileController:
 
 
 recorder = MacroFileController()
-recorder.create_macro()
-recorder.activate_listeners()
+#recorder.create_macro()
+#recorder.activate_listeners()
+recorder.save_macro("dm_macro2.py")
 # recorder.play_macro()
 recorder.running = True
 
-filepath = os.path.dirname(os.path.abspath(__file__))+'\\'
-src = r''+filepath+'main.py'
-dst = r''+filepath+'macrofilecontroller.py'
-shutil.copyfile(src, dst)
+# src = r''+self.currentdir+'main.py'
+# dst = r''+self.currentdir+'macrofilecontroller.py'
+# shutil.copyfile(src, dst)
 
+counter = 0
 while recorder.running:
-    time.sleep(1)
+    counter += 1
 print("Done!")
