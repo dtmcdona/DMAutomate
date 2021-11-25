@@ -5,15 +5,15 @@ from sys import platform
 # Basic editor/inserter allows user to edit macro without another program
 # Most of this will be replaced/modified with a GUI at some point
 
-class MacroMenuView:
+class MacroView:
     def __init__(self):
         # Action keeps track of current operation for the console
         self.action = "display"
         self.editing = False
         if platform == "linux" or platform == "linux2":
-            self.currentdir = os.path.dirname(os.path.abspath(__file__)) + '/'
+            self.currentdir = os.path.dirname(os.path.abspath(__file__)) + '/macros'
         elif platform == "win32":
-            self.currentdir = os.path.dirname(os.path.abspath(__file__)) + '\\'
+            self.currentdir = os.path.dirname(os.path.abspath(__file__)) + '\\macros\\'
 
     def display_menu(self):
         self.action == "display"
@@ -26,26 +26,55 @@ class MacroMenuView:
         print('|  4  | Save macro as...            |')
         print('|  5  | Delete macro...             |')
         print('|  6  | Insert into current macro   |')
-        print('|  7  | Continue recording          |')
+        print('|  7  | Record macro                |')
+        print('|  8  | Play macro                  |')
+        print('|  9  | View file                   |')
+        print('|  10  | Settings                   |')
         print('|===================================|')
+        user_input = input()
+        if user_input == '1':
+            self.action = "create"
+        elif user_input == '2':
+            self.action = "open"
+        elif user_input == '3':
+            self.action = "edit"
+        elif user_input == '4':
+            self.action = "save"
+        elif user_input == '5':
+            self.action = "delete"
+        elif user_input == '6':
+            self.action = "insert"
+        elif user_input == '7':
+            self.action = "record"
+        elif user_input == '8':
+            self.action = "play"
+        elif user_input == '9':
+            self.action = "view"
+        elif user_input == '10':
+            self.action = "settings"
+        else:
+            self.action = "display"
+        return self.action
 
     def display_list(self):
         self.action = "list"
-        print('|========== -(File list)- ==========|')
+        print('|=========== -(File list)- ===========|')
         files = os.listdir(self.currentdir)
         pyfiles = []
         counter = 0
         # Maybe give macros a unique identifier to only show macros
         for f in files:
             if '.py' in f:
-                print('| Index '+str(counter)+' | '+str(f))
-                pyfiles.append(str(f))
-                counter += 1
+                if not str(f) == "dm_macro.py":
+                    print('| Index '+str(counter)+' | '+str(f))
+                    pyfiles.append(str(f))
+                    counter += 1
+        return pyfiles
 
     def display_file(self, filename):
-        self.action = "file"
+        self.action = "view"
         print('|========== -('+filename+')- ==========|')
-        with open(filename) as input_file:
+        with open(self.currentdir+filename) as input_file:
             for i, line in enumerate(input_file):
                 print("{0} |".format(i+1)+line, end=""),
         print("|There are {0} lines of code in ".format(i+1)+filename+"|")
@@ -61,11 +90,23 @@ class MacroMenuView:
 
     def delete_input(self):
         self.action = "delete"
-        print('What filename and extension would you like to delete?')
-        # Take input
-        user_input = input()
-        if os.path.exists(user_input):
-            os.remove(user_input)
+        print('|=========== -(File list)- ===========|')
+        files = os.listdir(self.currentdir)
+        pyfiles = []
+        counter = 0
+        # Maybe give macros a unique identifier to only show macros
+        for f in files:
+            if '.py' in f:
+                if not str(f) == "dm_macro.py":
+                    print('| Index ' + str(counter) + ' | ' + str(f))
+                    pyfiles.append(str(f))
+                    counter += 1
+        print('| Which index would you like to delete? |')
+        user_input = int(input())
+        filename = pyfiles[user_input]
+        print(filename)
+        if os.path.exists(self.currentdir+filename):
+            os.remove(self.currentdir+filename)
         else:
             print("That file does not exist.")
 
@@ -73,11 +114,11 @@ class MacroMenuView:
         self.action = "insert"
         self.editing = True
         while self.editing:
-            print('What line of {0} do you want to insert code?'.format(filename))
+            print('What line of {0} do you want to insert code before?'.format(filename))
             # Take input
             insert_line = int(input())
             if insert_line < 1:
-                print('Cannot do less than line 1.  What line of {0} do you want to insert code?')
+                print('Cannot do less than line 1.  What line of {0} do you want to insert code before?')
                 # Take input
                 insert_line = int(input())
             print('Enter the line of code to insert.')
@@ -98,23 +139,22 @@ class MacroMenuView:
                     if i not in [(insert_line-1)]:
                         file_input.write(line)
                     elif i is (insert_line-1):
-                        file_input.write(user_input)
+                        file_input.write(user_input+'\n')
+                        file_input.write(line)
 
             file_input.close()
             print("Would you like to insert again? (y/n)")
             # Loop if 'y' or return to main menu but just quit for now
-            user_input = input()
+            user_input = input().lower()
             if user_input == 'y' or user_input == 'yes':
                 self.editing = True
-            elif user_input == 'n' or user_input == 'no':
-                self.editing = False
             else:
                 self.editing = False
 
 
 
-mmv = MacroMenuView()
-mmv.display_menu()
-mmv.display_list()
-mmv.display_file('dm_macro.py')
-mmv.insert_input('dm_macro.py')
+# mmv = MacroMenuView()
+# mmv.display_menu()
+# mmv.display_list()
+# mmv.display_file(mmv.display_list())
+# mmv.insert_input('dm_macro.py')
