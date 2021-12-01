@@ -1,10 +1,16 @@
 # Lets import the libraries
 import socket, cv2, pickle, struct, imutils
 import numpy as np
-from PIL import ImageGrab
-from mss import mss
+from sys import platform
 import pyautogui
 
+screen_width, screen_height = pyautogui.size()
+if platform == "win32":
+    from PIL import ImageGrab
+    from mss import mss
+    bounding_box = {'top': 0, 'left': 0, 'width': screen_width, 'height': screen_height}
+    sct = mss()
+    
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 host_name = socket.gethostname()
 host_ip = socket.gethostbyname(host_name)
@@ -13,9 +19,6 @@ socket_address = (host_ip, port)
 server_socket.bind(socket_address)
 server_socket.listen(5)
 print("Server:", socket_address)
-screen_width, screen_height = pyautogui.size()
-bounding_box = {'top': 0, 'left': 0, 'width': screen_width, 'height': screen_height}
-sct = mss()
 running = True
 
 while running:
@@ -24,8 +27,11 @@ while running:
     if client_socket:
         client_connected = True
         while client_connected:
-            screenshot = sct.grab(bounding_box)
-            scale_percent = 75
+            if platform == "linux" or platform == "linux2":
+                screenshot = pyautogui.screenshot(region=(0, 0, screen_width, screen_height))
+            elif platform == "win32":
+                screenshot = sct.grab(bounding_box)
+            scale_percent = 100
             scaled_width = int(screen_width * scale_percent / 100)
             scaled_height = int(screen_height * scale_percent / 100)
             scaled_tuple = (scaled_width, scaled_height)
