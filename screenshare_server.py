@@ -12,8 +12,9 @@ if platform == "win32":
     sct = mss()
     
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 host_name = socket.gethostname()
-host_ip = socket.gethostbyname(host_name)
+host_ip = '127.0.0.1'
 port = 8080
 socket_address = (host_ip, port)
 server_socket.bind(socket_address)
