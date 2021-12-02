@@ -5,10 +5,13 @@ import struct
 import pyautogui
 import numpy as np
 
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+print('Connecting to server...')
+client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 host_ip = socket.gethostname()
 port = 8080
 client_socket.connect((host_ip, port))
+print('Connected!')
 data = b""
 payload_size = struct.calcsize("Q")
 screen_width, screen_height = pyautogui.size()
