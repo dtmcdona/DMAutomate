@@ -43,6 +43,8 @@ class MacroController:
         # The current backup file will be named "dm_macro.py" and
         # users will be able to save/load under other names
         self.filename = "dm_macro.py"
+        # Number of times to repeat this macro with 1 as default
+        self.numRepeats = 1
 
     def on_move(self, x, y):
         if self.running:
@@ -55,9 +57,19 @@ class MacroController:
                 # Calc delta time to save to macro
                 self.delta_time()
                 if self.deltaTime > 0.0001:
-                    macroFile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ", duration="+str(self.deltaTime)+")\n")
+                    if self.randomEnabled:
+                        macroFile.write(self.currentIndent + "randommouse.random_move(" + str(self.currentMouseX) + ", " + str(
+                            self.currentMouseY) + ")\n")
+                        macroFile.write(self.currentIndent + "randommouse.mouse_drift()\n")
+                    else:
+                        macroFile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ", duration="+str(self.deltaTime)+")\n")
                 else:
-                    macroFile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(
+                    if self.randomEnabled:
+                        macroFile.write(self.currentIndent + "randommouse.random_move(" + str(self.currentMouseX) + ", " + str(
+                            self.currentMouseY) + ")\n")
+                        macroFile.write(self.currentIndent + "randommouse.mouse_drift()\n")
+                    else:
+                        macroFile.write(self.currentIndent + "pyautogui.moveTo(" + str(self.currentMouseX) + ", " + str(
                         self.currentMouseY) + ")\n")
                 macroFile.close()
                 self.prevMouseX = self.currentMouseX
@@ -80,6 +92,8 @@ class MacroController:
                 if button == mouseButton.right:
                     macroFile.write(self.currentIndent + "pyautogui.click(" + str(self.currentMouseX) + ", " + str(self.currentMouseY) + ", button='right')\n")
                     macroFile.close()
+                if self.randomEnabled:
+                    macroFile.write(self.currentIndent + "randommouse.mouse_drift()\n")
             print('Mouse '+str(button)+' {0} at {1}'.format('pressed' if pressed else 'released', (x, y)))
             if not pressed:
                 # Stop listener
@@ -137,10 +151,14 @@ class MacroController:
         time.sleep(.5)
         # Setup initial file
         newMacroFile.write("import time\nimport pyautogui\nimport random\n")
+        newMacroFile.write("import randommouse\n")
         newMacroFile.write("from pynput.keyboard import Key, Controller\n\n")
         newMacroFile.write("def macro_func():\n\tkeyboard = Controller()\n")
         self.currentIndent = "\t"
         newMacroFile.write(self.currentIndent + "# pyautogui.FAILSAFE = False\n")
+        newMacroFile.write(self.currentIndent + "numRepeats = {0}\n".format(self.numRepeats))
+        newMacroFile.write(self.currentIndent + "while numRepeats > 0:\nnumRepeats -= 1")
+        self.currentIndent = "\t\t"
         newMacroFile.close()
         # Reset deltatime
         self.delta_time()
