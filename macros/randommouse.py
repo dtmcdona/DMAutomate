@@ -31,6 +31,16 @@ def random_move(x, y):
     pyautogui.moveTo(x, y)
 
 
+def random_click(x, y, mouse_button):
+    randX = x + random.randrange(-3, 3)
+    randY = y + random.randrange(-3, 3)
+    randDuration = (random.randrange(150, 450, 6)) / 1000
+    pyautogui.moveTo(randX, randY)
+    pyautogui.mouseDown(button=mouse_button)
+    time.sleep(randDuration)
+    pyautogui.mouseUp(button=mouse_button)
+
+
 def mouse_drift():
     # Function to make the user seem more human with slightly moving mouse on accident/boredom
     randRepeat = random.randrange(0, 6)
