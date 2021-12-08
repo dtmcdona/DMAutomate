@@ -25,7 +25,7 @@ class Client:
         print('Connecting to server...')
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        host_ip = '192.168.1.8'
+        host_ip = '127.0.0.1'
         port = 8080
         self.client_socket.connect((host_ip, port))
         print('Connected!')

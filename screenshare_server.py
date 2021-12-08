@@ -19,7 +19,7 @@ class Server:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         host_name = socket.gethostname()
-        host_ip = '192.168.1.8'
+        host_ip = '127.0.0.1'
         port = 8080
         socket_address = (host_ip, port)
         self.server_socket.bind(socket_address)
