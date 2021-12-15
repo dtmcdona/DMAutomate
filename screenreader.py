@@ -1,5 +1,5 @@
 import time
-
+import string
 import pyautogui
 import cv2
 import numpy as np
@@ -22,6 +22,8 @@ class Reader:
         elif platform == "win32":
             self.imagedir = os.path.dirname(os.path.abspath(__file__)) + '\\images\\'
         self.object_directory = ''
+        self.number_directory = os.path.join(self.imagedir, 'Numbers')
+        self.character_directory = os.path.join(self.imagedir, 'Characters')
         self.currentMouseX, self.currentMouseY = pyautogui.position()
         self.prevMouseX = 0
         self.prevMouseY = 0
@@ -65,14 +67,198 @@ class Reader:
             print("There are no matches.")
         return matches
 
-    def object_search(self, object_name, haystack_filename):
+    def number_search(self, threshold, haystack_filename):
+        # Keep track of all matches and identify unique cases
+        numbers = []
+        if os.path.exists(self.number_directory):
+            if os.path.exists(self.number_directory):
+                files = os.listdir(self.number_directory)
+                self.image_index = 1
+                haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
+                grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
+                match_number = 0
+                while match_number < 10:
+                    for f in files:
+                        if '.png' in f:
+                            matches = []
+                            image_path = os.path.join(self.number_directory, str(match_number) + '_' + str(self.image_index) + '.png')
+                            print(image_path)
+                            if not os.path.exists(image_path):
+                                break
+                            needle = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+                            grayscale_needle = cv2.cvtColor(needle, cv2.COLOR_BGR2GRAY)
+                            result = cv2.matchTemplate(grayscale_haystack, grayscale_needle, cv2.TM_CCOEFF_NORMED)
+                            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                            # Max location has the best match with max_val to be % accuracy
+                            width = needle.shape[1]
+                            height = needle.shape[0]
+                            bottom_right = (max_loc[0] + width, max_loc[1] + height)
+                            # Threshold is the % accuracy compared to original needle
+                            yloc, xloc = np.where(result >= threshold)
+                            if len(xloc) > 0:
+                                print("There are {0} total matches in the haystack.".format(len(xloc)))
+                                for (x, y) in zip(xloc, yloc):
+                                    # Twice to ensure singles are kept after picking unique cases
+                                    matches.append([int(x), int(y), int(width), int(height)])
+                                    matches.append([int(x), int(y), int(width), int(height)])
+                                # Grouping function
+                                matches, weights = cv2.groupRectangles(matches, 1, 0.2)
+                                print("There are {0} unique matches in the haystack.".format(len(matches)))
+                                # Display image with rectangle
+                                for (x, y, width, height) in matches:
+                                    if (x, y, width, height) not in numbers:
+                                        numbers.append([int(x), int(y), int(width), int(height), int(match_number)])
+                                    cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
+                                # cv2.imshow('Haystack', haystack)
+                                # cv2.waitKey()
+                                # cv2.destroyAllWindows()
+                            else:
+                                print("There are no matches.")
+                            self.image_index += 1
+                            print("Found " + str(len(numbers)) + " of numbers in " + haystack_filename)
+                    match_number += 1
+                    self.image_index = 1
+            else:
+                print("Numbers do not exist in screenshot.")
+            print(numbers)
+            return numbers
+
+    def sort_matches(self, sort_index, threshold,  match_list):
+        # Bubble sort algo
+        match_len = len(match_list)
+        for y1 in range(match_len-1):
+            for y2 in range(0, match_len - y1 - 1):
+                # If index is greater than next index
+                if match_list[y2][sort_index] > match_list[y2+1][sort_index]:
+                    # If difference of index values is greater than the threshold
+                    if abs(match_list[y2][sort_index] - match_list[y2+1][sort_index]) > threshold:
+                        match_list[y2], match_list[y2+1] = match_list[y2+1], match_list[y2]
+
+    def number_concat(self, threshold, price, matches):
+        match_len = len(matches)
+        temp_array = matches[0]
+        counter = 0
+        result_array = []
+        for index in range(0, match_len-1):
+            print(index)
+            if abs(matches[index][1] - matches[index+1][1]) < threshold:
+                print(temp_array)
+                # Sum width of each character
+                temp_array[2] = temp_array[2] + matches[index+1][2]
+                # Multiply index value by 10 and add index+1
+                temp_array[4] = (temp_array[4]*10) + matches[index+1][4]
+                print(temp_array)
+                if index == match_len - 2:
+                    result_array.append(temp_array)
+                    temp_array = matches[index + 1]
+            else:
+                result_array.append(temp_array)
+                temp_array = matches[index+1]
+        if price:
+            for number in result_array:
+                number[4] = number[4]/100
+        print(result_array)
+
+    def proximity_combine(self, list_a, list_b):
+        list_a_len = len(list_a)
+        list_b_len = len(list_b)
+        combined_list = []
+        for index_a in range(0, list_a_len):
+            for index_b in range(0, list_b_len):
+                distance_x = abs(list_a[index_a][0] - list_b[index_b][0])
+                distance_y = abs(list_a[index_a][1] - list_b[index_b][1])
+                # Finds smallest width
+                padding = (min(list_a[index_a][2], list_b[index_b][2]))*2
+                if distance_x < padding and distance_y < padding:
+                    if list_a[index_a][0] < list_b[index_b][0]:
+                        combined_str = str(list_a[index_a][4])+str(list_b[index_b][4])
+                        new_x = list_a[index_a][0]
+                        new_y = list_a[index_a][1]
+                    else:
+                        combined_str = str(list_b[index_b][4]) + str(list_a[index_a][4])
+                        new_x = list_a[index_b][0]
+                        new_y = list_a[index_b][1]
+                    if combined_str not in combined_list:
+                        combined_width = list_a[index_a][2]+list_b[index_b][2]
+                        new_height = list_a[index_a][3]
+                        combined_list.append([new_x, new_y, combined_width, new_height, combined_str])
+        return combined_list
+
+    def character_search(self, threshold, haystack_filename):
+        # Keep track of all matches and identify unique cases
+        chars = []
+        char_list = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '-', '+', '=']
+        char_list_len = len(char_list)
+        if os.path.exists(self.character_directory):
+            files = os.listdir(self.character_directory)
+            self.image_index = 1
+            haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
+            grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
+            match_number = 0
+            while match_number < char_list_len - 1:
+                for f in files:
+                    if '.png' in f:
+                        matches = []
+                        image_path = os.path.join(self.character_directory,
+                                                  char_list[match_number] + '_' + str(self.image_index) + '.png')
+                        print(image_path)
+                        if not os.path.exists(image_path):
+                            break
+                        needle = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+                        grayscale_needle = cv2.cvtColor(needle, cv2.COLOR_BGR2GRAY)
+                        result = cv2.matchTemplate(grayscale_haystack, grayscale_needle, cv2.TM_CCOEFF_NORMED)
+                        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                        # Max location has the best match with max_val to be % accuracy
+                        width = needle.shape[1]
+                        height = needle.shape[0]
+                        bottom_right = (max_loc[0] + width, max_loc[1] + height)
+                        # Threshold is the % accuracy compared to original needle
+                        yloc, xloc = np.where(result >= threshold)
+                        if len(xloc) > 0:
+                            print("There are {0} total matches in the haystack.".format(len(xloc)))
+                            for (x, y) in zip(xloc, yloc):
+                                # Twice to ensure singles are kept after picking unique cases
+                                matches.append([int(x), int(y), int(width), int(height)])
+                                matches.append([int(x), int(y), int(width), int(height)])
+                            # Grouping function
+                            matches, weights = cv2.groupRectangles(matches, 1, 0.2)
+                            print("There are {0} unique matches in the haystack.".format(len(matches)))
+                            # Display image with rectangle
+                            for (x, y, width, height) in matches:
+                                if (x, y, width, height) not in chars:
+                                    chars.append([int(x), int(y), int(width), int(height), char_list[match_number]])
+                                # cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
+                            # cv2.imshow('Haystack', haystack)
+                            # cv2.waitKey()
+                            # cv2.destroyAllWindows()
+                        else:
+                            print("There are no matches.")
+                        self.image_index += 1
+                        print("Found " + str(len(chars)) + " of numbers in " + haystack_filename)
+                match_number += 1
+                self.image_index = 1
+            else:
+                print("Characters do not exist in screenshot.")
+            print(chars)
+            return chars
+
+    def draw_info(self, matches, haystack_filename):
+        boxes = []
+        haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
+        for (x, y, width, height, name) in matches:
+            if (x, y, width, height) not in boxes:
+                boxes.append([int(x), int(y), int(width), int(height)])
+            cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
+        cv2.imshow('Haystack', haystack)
+        cv2.waitKey()
+        cv2.destroyAllWindows()
+
+    def object_search(self, object_name, threshold, haystack_filename):
         self.object_directory = os.path.join(self.imagedir, object_name)
         # Keep track of all matches and identify unique cases
         objects = []
         if os.path.exists(self.object_directory):
             files = os.listdir(self.object_directory)
-            # Threshold is the % accuracy compared to original needle
-            threshold = .95
             self.image_index = 1
             haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
             grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
@@ -88,6 +274,7 @@ class Reader:
                     width = needle.shape[1]
                     height = needle.shape[0]
                     bottom_right = (max_loc[0] + width, max_loc[1] + height)
+                    # Threshold is the % accuracy compared to original needle
                     yloc, xloc = np.where(result >= threshold)
                     if len(xloc) > 0:
                         print("There are {0} total matches in the haystack.".format(len(xloc)))
@@ -112,12 +299,12 @@ class Reader:
                     print("Found " + str(len(objects)) + " of " + object_name + " in " + haystack_filename)
         else:
             print("Object does not exist in image files.")
-        return matches
+        return objects
 
-    def pick_random(self, match_list):
-        if len(match_list) > 0:
-            rand = random.randrange(0, len(match_list))
-            return match_list[rand]
+    def pick_random(self, matches):
+        if len(matches) > 0:
+            rand = random.randrange(0, len(matches))
+            return matches[rand]
         else:
             return None
 
@@ -218,11 +405,23 @@ class Reader:
 
 reader = Reader()
 reader.activate_listeners()
-screenshot = pyautogui.screenshot(reader.imagedir+'screenshot.png')
-match_list = reader.object_search('Test', 'screenshot.png')
-match_list2 = reader.image_search('Capture.PNG', 'screenshot.png')
-rand_match = reader.pick_random(match_list2)
-pyautogui.moveTo(reader.center_pos(rand_match))
-print("Picked: "+str(rand_match))
+# screenshot = pyautogui.screenshot(reader.imagedir+'screenshot.png')
+char_list = reader.character_search(.85, 'price_screenshot.png')
+reader.sort_matches(0, 0, char_list)
+reader.sort_matches(1, 5, char_list)
+num_list = reader.number_search(.85, 'price_screenshot.png')
+reader.sort_matches(0, 0, num_list)
+reader.sort_matches(1, 5, num_list)
+print(num_list)
+reader.draw_info(num_list, 'price_screenshot.png')
+reader.number_concat(5, True, num_list)
+print(char_list)
+prices = reader.proximity_combine(char_list, num_list)
+print(prices)
+reader.draw_info(prices, 'price_screenshot.png')
+# match_list2 = reader.image_search('Capture.PNG', .85, 'screenshot.png')
+# rand_match = reader.pick_random(match_list2)
+# pyautogui.moveTo(reader.center_pos(rand_match))
+# print("Picked: "+str(rand_match))
 while True:
     continue
