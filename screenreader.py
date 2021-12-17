@@ -159,6 +159,58 @@ class Reader:
                 number[4] = number[4]/100
         print(result_array)
 
+    def character_concat(self, threshold, multiboxes, matches):
+        match_len = len(matches)
+        temp_array = matches[0]
+        result_array = []
+        if multiboxes:
+            skip_next = False
+        for index in range(1, match_len):
+            if abs(matches[index-1][1] - matches[index][1]) < threshold:
+                print(temp_array)
+                # Sum width of each character
+                temp_array[2] = temp_array[2] + (matches[index][0]-matches[index-1][0])
+                # Add character to the end
+                if multiboxes:
+                    if not skip_next:
+                        temp_array[4] = temp_array[4] + matches[index][4]
+                    else:
+                        skip_next = False
+                else:
+                    temp_array[4] = temp_array[4] + matches[index][4]
+                print(temp_array)
+                if index < match_len-1 and abs((matches[index][0]+matches[index][2]) - matches[index+1][0]) > threshold and len(temp_array[4]) > 1:
+                    if multiboxes:
+                        skip_next = True
+                        temp_array[2] = matches[index][2] + matches[index][0] - temp_array[0]
+                        result_array.append(temp_array)
+                        temp_array = matches[index+1]
+                        index += 2
+                    else:
+                        temp_array[4] = temp_array[4] + ' '
+                if index == match_len - 1 and len(temp_array[4]) > 1:
+                    result_array.append(temp_array)
+                    temp_array = matches[index]
+            elif len(temp_array[4]) > 1:
+                result_array.append(temp_array)
+                temp_array = matches[index]
+        # Clean up results
+        print(result_array[0][4])
+        result_len = len(result_array)
+        for index in range(0, result_len-2):
+            if multiboxes:
+                temp_str = result_array[index][4]
+                result_array[index][4] = temp_str.replace("o8", "8").replace("co", "c").replace("og", "g")
+                if index > 0 and result_array[index][4] == 'rg':
+                    result_array.pop(index)
+                    result_array[index-1][4] = result_array[index-1][4] + 'g'
+                if result_array[index][4] == 'lng':
+                    result_array.pop(index)
+                    result_array[index-1][4] = result_array[index-1][4] + 'ng'
+            elif not multiboxes:
+                result_array[index][4] = result_array[index][4].replace("n r g", "ng").replace("c o", "c").replace("i l", "i").replace("n r ", "n")
+        return result_array
+
     def proximity_combine(self, list_a, list_b):
         list_a_len = len(list_a)
         list_b_len = len(list_b)
@@ -184,23 +236,34 @@ class Reader:
                         combined_list.append([new_x, new_y, combined_width, new_height, combined_str])
         return combined_list
 
-    def character_search(self, threshold, haystack_filename):
+    def character_search(self, threshold, letters, haystack_filename):
         # Keep track of all matches and identify unique cases
         chars = []
-        char_list = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '-', '+', '=']
-        char_list_len = len(char_list)
+        chars_list = []
+        if letters:
+            chars_list = ['A', 'B', 'C', 'D', 'E',
+                          'F', 'G', 'H', 'I', 'J',
+                          'K', 'L', 'M', 'N', 'O',
+                          'P', 'Q', 'R', 'S', 'T',
+                          'U', 'V', 'W', 'X', 'Y',
+                          'Z', '0', '1', '2', '3',
+                          '4', '5', '6', '7', '8',
+                          '9']
+        else:
+            chars_list = ['!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '-', '+', '=']
+        chars_list_len = len(chars_list)
         if os.path.exists(self.character_directory):
             files = os.listdir(self.character_directory)
             self.image_index = 1
             haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
             grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
             match_number = 0
-            while match_number < char_list_len - 1:
+            while match_number < chars_list_len:
                 for f in files:
                     if '.png' in f:
                         matches = []
                         image_path = os.path.join(self.character_directory,
-                                                  char_list[match_number] + '_' + str(self.image_index) + '.png')
+                                                  chars_list[match_number] + '_' + str(self.image_index) + '.png')
                         print(image_path)
                         if not os.path.exists(image_path):
                             break
@@ -226,7 +289,7 @@ class Reader:
                             # Display image with rectangle
                             for (x, y, width, height) in matches:
                                 if (x, y, width, height) not in chars:
-                                    chars.append([int(x), int(y), int(width), int(height), char_list[match_number]])
+                                    chars.append([int(x), int(y), int(width), int(height), str(chars_list[match_number]).lower()])
                                 # cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
                             # cv2.imshow('Haystack', haystack)
                             # cv2.waitKey()
@@ -404,21 +467,29 @@ class Reader:
 
 
 reader = Reader()
-reader.activate_listeners()
+# reader.activate_listeners()
 # screenshot = pyautogui.screenshot(reader.imagedir+'screenshot.png')
-char_list = reader.character_search(.85, 'price_screenshot.png')
-reader.sort_matches(0, 0, char_list)
-reader.sort_matches(1, 5, char_list)
-num_list = reader.number_search(.85, 'price_screenshot.png')
-reader.sort_matches(0, 0, num_list)
-reader.sort_matches(1, 5, num_list)
-print(num_list)
-reader.draw_info(num_list, 'price_screenshot.png')
-reader.number_concat(5, True, num_list)
-print(char_list)
-prices = reader.proximity_combine(char_list, num_list)
-print(prices)
-reader.draw_info(prices, 'price_screenshot.png')
+# char_list = reader.character_search(.85, False, 'price_screenshot.png')
+# reader.sort_matches(0, 0, char_list)
+# reader.sort_matches(1, 5, char_list)
+# num_list = reader.number_search(.85, 'price_screenshot.png')
+# reader.sort_matches(0, 0, num_list)
+# reader.sort_matches(1, 5, num_list)
+# print(num_list)
+# reader.draw_info(num_list, 'price_screenshot.png')
+# reader.number_concat(5, True, num_list)
+# print(char_list)
+# prices = reader.proximity_combine(char_list, num_list)
+# print(prices)
+# reader.draw_info(prices, 'price_screenshot.png')
+letter_list = reader.character_search(.94, True, 'price_screenshot.png')
+reader.sort_matches(0, 0, letter_list)
+reader.sort_matches(1, 5, letter_list)
+print(letter_list)
+reader.draw_info(letter_list, 'price_screenshot.png')
+words = reader.character_concat(5, True, letter_list)
+print(words)
+reader.draw_info(words, 'price_screenshot.png')
 # match_list2 = reader.image_search('Capture.PNG', .85, 'screenshot.png')
 # rand_match = reader.pick_random(match_list2)
 # pyautogui.moveTo(reader.center_pos(rand_match))
