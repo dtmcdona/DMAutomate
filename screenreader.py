@@ -12,7 +12,6 @@ from sys import platform
 
 class Reader:
     def __init__(self):
-        self.status = "idle"
         self.running = False
         self.listeners = False
         self.start_button = '`'
@@ -33,6 +32,7 @@ class Reader:
         self.deltaTime = round((time.perf_counter() - self.lastTimestamp), 1)
 
     def image_search(self, needle_filename, haystack_filename):
+        # Search for needle in a haystack
         needle = cv2.imread(self.imagedir+needle_filename, cv2.IMREAD_UNCHANGED)
         grayscale_needle = cv2.cvtColor(needle, cv2.COLOR_BGR2GRAY)
         haystack = cv2.imread(self.imagedir+haystack_filename, cv2.IMREAD_UNCHANGED)
@@ -71,57 +71,56 @@ class Reader:
         # Keep track of all matches and identify unique cases
         numbers = []
         if os.path.exists(self.number_directory):
-            if os.path.exists(self.number_directory):
-                files = os.listdir(self.number_directory)
+            files = os.listdir(self.number_directory)
+            self.image_index = 1
+            haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
+            grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
+            match_number = 0
+            while match_number < 10:
+                for f in files:
+                    if '.png' in f:
+                        matches = []
+                        image_path = os.path.join(self.number_directory, str(match_number) + '_' + str(self.image_index) + '.png')
+                        print(image_path)
+                        if not os.path.exists(image_path):
+                            break
+                        needle = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+                        grayscale_needle = cv2.cvtColor(needle, cv2.COLOR_BGR2GRAY)
+                        result = cv2.matchTemplate(grayscale_haystack, grayscale_needle, cv2.TM_CCOEFF_NORMED)
+                        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                        # Max location has the best match with max_val to be % accuracy
+                        width = needle.shape[1]
+                        height = needle.shape[0]
+                        bottom_right = (max_loc[0] + width, max_loc[1] + height)
+                        # Threshold is the % accuracy compared to original needle
+                        yloc, xloc = np.where(result >= threshold)
+                        if len(xloc) > 0:
+                            print("There are {0} total matches in the haystack.".format(len(xloc)))
+                            for (x, y) in zip(xloc, yloc):
+                                # Twice to ensure singles are kept after picking unique cases
+                                matches.append([int(x), int(y), int(width), int(height)])
+                                matches.append([int(x), int(y), int(width), int(height)])
+                            # Grouping function
+                            matches, weights = cv2.groupRectangles(matches, 1, 0.2)
+                            print("There are {0} unique matches in the haystack.".format(len(matches)))
+                            # Display image with rectangle
+                            for (x, y, width, height) in matches:
+                                if (x, y, width, height) not in numbers:
+                                    numbers.append([int(x), int(y), int(width), int(height), int(match_number)])
+                                cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
+                            # cv2.imshow('Haystack', haystack)
+                            # cv2.waitKey()
+                            # cv2.destroyAllWindows()
+                        else:
+                            print("There are no matches.")
+                        self.image_index += 1
+                        print("Found " + str(len(numbers)) + " of numbers in " + haystack_filename)
+                match_number += 1
                 self.image_index = 1
-                haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
-                grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
-                match_number = 0
-                while match_number < 10:
-                    for f in files:
-                        if '.png' in f:
-                            matches = []
-                            image_path = os.path.join(self.number_directory, str(match_number) + '_' + str(self.image_index) + '.png')
-                            print(image_path)
-                            if not os.path.exists(image_path):
-                                break
-                            needle = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
-                            grayscale_needle = cv2.cvtColor(needle, cv2.COLOR_BGR2GRAY)
-                            result = cv2.matchTemplate(grayscale_haystack, grayscale_needle, cv2.TM_CCOEFF_NORMED)
-                            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
-                            # Max location has the best match with max_val to be % accuracy
-                            width = needle.shape[1]
-                            height = needle.shape[0]
-                            bottom_right = (max_loc[0] + width, max_loc[1] + height)
-                            # Threshold is the % accuracy compared to original needle
-                            yloc, xloc = np.where(result >= threshold)
-                            if len(xloc) > 0:
-                                print("There are {0} total matches in the haystack.".format(len(xloc)))
-                                for (x, y) in zip(xloc, yloc):
-                                    # Twice to ensure singles are kept after picking unique cases
-                                    matches.append([int(x), int(y), int(width), int(height)])
-                                    matches.append([int(x), int(y), int(width), int(height)])
-                                # Grouping function
-                                matches, weights = cv2.groupRectangles(matches, 1, 0.2)
-                                print("There are {0} unique matches in the haystack.".format(len(matches)))
-                                # Display image with rectangle
-                                for (x, y, width, height) in matches:
-                                    if (x, y, width, height) not in numbers:
-                                        numbers.append([int(x), int(y), int(width), int(height), int(match_number)])
-                                    cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
-                                # cv2.imshow('Haystack', haystack)
-                                # cv2.waitKey()
-                                # cv2.destroyAllWindows()
-                            else:
-                                print("There are no matches.")
-                            self.image_index += 1
-                            print("Found " + str(len(numbers)) + " of numbers in " + haystack_filename)
-                    match_number += 1
-                    self.image_index = 1
-            else:
-                print("Numbers do not exist in screenshot.")
-            print(numbers)
-            return numbers
+        else:
+            print("Numbers do not exist in screenshot.")
+        print(numbers)
+        return numbers
 
     def sort_matches(self, sort_index, threshold,  match_list):
         # Bubble sort algo
@@ -135,9 +134,9 @@ class Reader:
                         match_list[y2], match_list[y2+1] = match_list[y2+1], match_list[y2]
 
     def number_concat(self, threshold, price, matches):
+        # Concat data together to form usable numbers
         match_len = len(matches)
         temp_array = matches[0]
-        counter = 0
         result_array = []
         for index in range(0, match_len-1):
             print(index)
@@ -159,7 +158,133 @@ class Reader:
                 number[4] = number[4]/100
         print(result_array)
 
+    def set_selection(self, x1, y1, x2, y2):
+        # Selection is used to only search for objects in an area
+        self.selection = [x1, y1, x2, y2]
+
+    def get_selection(self, x1, y1, x2, y2):
+        # Selection is used to only search for objects in an area
+        return self.selection
+
+    def split_image(self, directory, filename, width_split, height_split):
+        # Split image is used to split an image into smaller images
+        image_path = os.path.join(directory, filename)
+        filenames_list = []
+        if not os.path.exists(image_path):
+            print("Filepath does not exist for split_image method.")
+            return filenames_list
+        img = cv2.imread(image_path)
+        width = int(img.shape[0])
+        height = int(img.shape[1])
+        if width_split > width:
+            print("Width is too large.")
+            return filenames_list
+        if height_split > height:
+            print("Height is too large.")
+            return filenames_list
+        for index_a in range(0, width, int(width_split)):
+            for index_b in range(0, height, int(height_split)):
+                x = index_a
+                y = index_b
+                image_path = os.path.join(directory, f"{filename.replace('.png', '')}_{index_a}_{index_b}.png")
+                cv2.imwrite(image_path, img[index_a:index_a + int(width_split), index_b:index_b + int(height_split), :])
+                filenames_list.append([int(x), int(y), int(width), int(height), f"{filename.replace('.png', '')}_{index_a}_{index_b}.png"])
+        print(filenames_list)
+        return filenames_list
+
+    def image_difference(self, threshold, needle_directory, needle_filename, haystack_directory, haystack_filename, iterations):
+        # Recursive function to find differences with remaining iterations
+        # representing how many times it will be cut into four parts
+        remaining_iterations = iterations - 1
+        # Record similarities and differences between two first images
+        similarities = []
+        differences = []
+        # Load haystack image
+        haystack_image_path = os.path.join(haystack_directory, haystack_filename)
+        if not os.path.exists(haystack_image_path):
+            print("Haystack file does not exist.")
+            return differences
+        img = cv2.imread(haystack_image_path)
+        section_width = img.shape[0] / 2
+        section_height = img.shape[1] / 2
+        # Cut haystack image into 4 sections
+        haystack_images = self.split_image(haystack_directory, haystack_filename, section_width, section_height)
+        # Load needle image
+        needle_image_path = os.path.join(needle_directory, needle_filename)
+        if not os.path.exists(needle_image_path):
+            print("Needle file does not exist.")
+            return differences
+        img = cv2.imread(needle_image_path)
+        # Cut needle image into 4 sections
+        section_width = img.shape[0] / 2
+        section_height = img.shape[1] / 2
+        needle_images = self.split_image(needle_directory, needle_filename, section_width, section_height)
+        # Loop through each needle section and haystack section and compare
+        for haystack_section in haystack_images:
+            for needle_section in needle_images:
+                # Format for needle/haystack section [x, y, width, height, filename]
+                # Only do loop if the x, y positions match
+                if not haystack_section[0] == needle_section[0]:
+                    continue
+                if not haystack_section[1] == needle_section[1]:
+                    continue
+                haystack_path = os.path.join(haystack_directory, haystack_section[4])
+                if not os.path.exists(haystack_path):
+                    print("Split haystack files do not exist.")
+                    return differences
+                needle_path = os.path.join(needle_directory, needle_section[4])
+                if not os.path.exists(needle_path):
+                    print("Split needle files do not exist.")
+                    return differences
+                # Turn both images to grayscale to speed up process
+                haystack = cv2.imread(haystack_path, cv2.IMREAD_UNCHANGED)
+                grayscale_haystack = cv2.cvtColor(haystack, cv2.COLOR_BGR2GRAY)
+                needle = cv2.imread(needle_path, cv2.IMREAD_UNCHANGED)
+                grayscale_needle = cv2.cvtColor(needle, cv2.COLOR_BGR2GRAY)
+                # Match the results
+                matches = []
+                result = cv2.matchTemplate(grayscale_haystack, grayscale_needle, cv2.TM_CCOEFF_NORMED)
+                min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+                # Max location has the best match with max_val to be % accuracy
+                width = needle.shape[1]
+                height = needle.shape[0]
+                bottom_right = (max_loc[0] + width, max_loc[1] + height)
+                # Threshold is the % accuracy compared to original needle
+                yloc, xloc = np.where(result >= threshold)
+                if len(xloc) > 0:
+                    # Similarity found
+                    print("There are {0} total matches in the haystack.".format(len(xloc)))
+                    for (x, y) in zip(xloc, yloc):
+                        # Twice to ensure singles are kept after picking unique cases
+                        matches.append([needle_section[0], needle_section[1], needle_section[2], needle_section[3]])
+                        matches.append([needle_section[0], needle_section[1], needle_section[2], needle_section[3]])
+                    # Grouping function
+                    matches, weights = cv2.groupRectangles(matches, 1, 0.2)
+                    print("There are {0} unique matches in the haystack.".format(len(matches)))
+                    if remaining_iterations == 0:
+                        # Display image with rectangle
+                        for (x, y, width, height) in matches:
+                            print("Similarity found:" + str(needle_section))
+                            similarities.append(needle_section)
+                            # cv2.rectangle(haystack, (x, y), (x + width, y + height), (255, 255, 0), 2)
+                        # cv2.imshow('Haystack', haystack)
+                        # cv2.waitKey()
+                        # cv2.destroyAllWindows()
+                elif remaining_iterations == 0:
+                    # Differences found in the last iteration
+                    print("Difference found:" + str(needle_section))
+                    differences.append(needle_section)
+                elif remaining_iterations > 0:
+                    # If there are differences then iterate this section for efficiency
+                    same_parts, different_parts = self.image_difference(threshold, needle_directory, needle_section[4], haystack_directory, haystack_section[4], remaining_iterations)
+                    similarities.append(same_parts)
+                    differences.append(different_parts)
+                else:
+                    print("There are no matches.")
+        return similarities, differences
+
     def character_concat(self, threshold, multiboxes, matches):
+        # Concat data together to form usable words
         match_len = len(matches)
         temp_array = matches[0]
         result_array = []
@@ -212,6 +337,7 @@ class Reader:
         return result_array
 
     def proximity_combine(self, list_a, list_b):
+        # Combine elements in lists to form combinations
         list_a_len = len(list_a)
         list_b_len = len(list_b)
         combined_list = []
@@ -306,6 +432,7 @@ class Reader:
             return chars
 
     def draw_info(self, matches, haystack_filename):
+        # Draw the matches on the original image
         boxes = []
         haystack = cv2.imread(self.imagedir + haystack_filename, cv2.IMREAD_UNCHANGED)
         for (x, y, width, height, name) in matches:
@@ -317,8 +444,8 @@ class Reader:
         cv2.destroyAllWindows()
 
     def object_search(self, object_name, threshold, haystack_filename):
-        self.object_directory = os.path.join(self.imagedir, object_name)
         # Keep track of all matches and identify unique cases
+        self.object_directory = os.path.join(self.imagedir, object_name)
         objects = []
         if os.path.exists(self.object_directory):
             files = os.listdir(self.object_directory)
@@ -365,6 +492,7 @@ class Reader:
         return objects
 
     def pick_random(self, matches):
+        # Pick random element in the matches list
         if len(matches) > 0:
             rand = random.randrange(0, len(matches))
             return matches[rand]
@@ -372,6 +500,7 @@ class Reader:
             return None
 
     def center_pos(self, single_match):
+        # Return center x, y coordinates of a match
         if single_match is not None:
             left = int(single_match[0] + (single_match[2]*3/8))
             right = int(single_match[0] + (single_match[2]*5/8))
@@ -415,6 +544,7 @@ class Reader:
             self.lastTimestamp = round(time.perf_counter(), 3)
 
     def on_click(self, x, y, button, pressed):
+        # Mouse press action
         if self.running:
             if pressed:
                 # Get mouse position
@@ -425,6 +555,7 @@ class Reader:
                 return False
 
     def on_release(self, key):
+        # Watch an object
         try:
             if key.char == self.start_button and self.running:
                 self.running = False
@@ -449,12 +580,13 @@ class Reader:
             print('Unique key {0} pressed'.format(key))
 
     def on_press(self, key):
+        # Key press
         if self.running:
             print('{0} pressed'.format(key))
 
     def activate_listeners(self):
-        self.listeners = True
         # Listeners are responsible for mouse/keyboard input
+        self.listeners = True
         listener = keyboard.Listener(
             on_press=self.on_press,
             on_release=self.on_release)
@@ -482,17 +614,21 @@ reader = Reader()
 # prices = reader.proximity_combine(char_list, num_list)
 # print(prices)
 # reader.draw_info(prices, 'price_screenshot.png')
-letter_list = reader.character_search(.94, True, 'price_screenshot.png')
-reader.sort_matches(0, 0, letter_list)
-reader.sort_matches(1, 5, letter_list)
-print(letter_list)
-reader.draw_info(letter_list, 'price_screenshot.png')
-words = reader.character_concat(5, True, letter_list)
-print(words)
-reader.draw_info(words, 'price_screenshot.png')
+# letter_list = reader.character_search(.94, True, 'price_screenshot.png')
+# reader.sort_matches(0, 0, letter_list)
+# reader.sort_matches(1, 5, letter_list)
+# print(letter_list)
+# reader.draw_info(letter_list, 'price_screenshot.png')
+# words = reader.character_concat(5, True, letter_list)
+# print(words)
+# reader.draw_info(words, 'price_screenshot.png')
 # match_list2 = reader.image_search('Capture.PNG', .85, 'screenshot.png')
 # rand_match = reader.pick_random(match_list2)
 # pyautogui.moveTo(reader.center_pos(rand_match))
 # print("Picked: "+str(rand_match))
+# Image difference tests
+similar, difference = reader.image_difference(.85, reader.imagedir, 'Image_diff_1.png', reader.imagedir, 'Image_diff_2.png', 2)
+print(similar)
+print(difference)
 while True:
     continue
