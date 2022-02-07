@@ -5,3 +5,4 @@ numpy
 pygame
 imutils
 win32gui
+kivy
