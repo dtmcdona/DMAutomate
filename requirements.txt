@@ -1,0 +1,7 @@
+pyautogui
+pynput
+opencv-python
+numpy
+pygame
+imutils
+win32gui
